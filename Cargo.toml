@@ -1,0 +1,50 @@
+[package]
+name = "pytakumi"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+license = "MIT OR Apache-2.0"
+description = "Python bindings for Takumi — render HTML, Markdown, and node trees to images without a browser."
+repository = "https://github.com/kane50613/takumi"
+readme = "README.md"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+arc-swap = "1"
+pyo3 = { version = "0.25", features = ["extension-module"] }
+pythonize = "0.25"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dependencies.takumi]
+path = "vendor/takumi/takumi"
+default-features = false
+features = [
+  "raster-backend",
+  "svg-backend",
+  "from-html",
+  "woff2",
+  "woff",
+  "svg-source",
+  "rayon",
+]
+
+[dependencies.takumi-bindings-common]
+path = "vendor/takumi/takumi-bindings-common"
+
+[dependencies.takumi-core]
+path = "vendor/takumi/takumi-core"
+default-features = false
+features = ["woff2", "woff", "svg"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = 3
+panic = "abort"

@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint-python:
+    name: Python syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: compileall
+        run: |
+          python -m compileall -q python/pytakumi tests benchmarks
+          python -c "from pathlib import Path; import ast; [ast.parse(p.read_text(encoding='utf-8')) for p in Path('python/pytakumi').rglob('*.py')]"
+
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout (with engine submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify submodule
+        shell: bash
+        run: |
+          test -f vendor/takumi/takumi/Cargo.toml
+          echo "engine pin: $(git -C vendor/takumi rev-parse --short HEAD)"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91.0"
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Install build & test deps
+        run: |
+          python -m pip install -U pip
+          python -m pip install maturin pytest markdown-it-py pillow
+
+      - name: maturin develop --release
+        run: maturin develop --release
+
+      - name: Import smoke
+        run: python -c "import pytakumi; from pytakumi import html_to_pic, text_to_pic, md_to_pic, Renderer; print('pytakumi', pytakumi.__version__)"
+
+      - name: Pytest (product suite)
+        run: python -m pytest -q --tb=short
+
+      - name: Pytest count guard
+        shell: bash
+        run: |
+          n=$(python -m pytest --collect-only -q | tail -n1 | awk '{print $1}')
+          echo "collected=$n"
+          # Fail if the suite shrinks accidentally below product baseline.
+          test "${n:-0}" -ge 80
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91.0"
+          components: clippy
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  # Lightweight sanity: one wheel on ubuntu for PR feedback without full matrix cost.
+  wheel-smoke:
+    name: Wheel smoke (linux x64, py3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91.0"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --out dist -i python3.12
+          manylinux: auto
+          command: build
+      - name: Install wheel & smoke
+        run: |
+          python -m pip install -U pip
+          python -m pip install dist/*.whl pytest markdown-it-py
+          python -c "from pytakumi import html_to_pic; b=html_to_pic('<div style=\"padding:20px\">ci</div>', width=200, height=80); assert b[:8]==b'\\x89PNG\\r\\n\\x1a\\n'"
+          pytest -q

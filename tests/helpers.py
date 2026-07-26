@@ -1,0 +1,113 @@
+"""Shared assertions and tiny fixtures for product-grade tests."""
+
+from __future__ import annotations
+
+import struct
+import zlib
+from typing import Sequence
+
+
+# --- Image codec probes -------------------------------------------------
+
+
+def assert_png(data: bytes, *, width: int | None = None, height: int | None = None) -> tuple[int, int]:
+    assert isinstance(data, (bytes, bytearray)), type(data)
+    assert data[:8] == b"\x89PNG\r\n\x1a\n", data[:16]
+    w, h = struct.unpack(">II", data[16:24])
+    if width is not None:
+        assert w == width, (w, width)
+    if height is not None:
+        assert h == height, (h, height)
+    return int(w), int(h)
+
+
+def assert_jpeg(data: bytes) -> None:
+    assert data[:2] == b"\xff\xd8", data[:8]
+    assert data[-2:] == b"\xff\xd9" or b"\xff\xd9" in data[-32:]
+
+
+def assert_webp(data: bytes) -> None:
+    assert data[:4] == b"RIFF", data[:12]
+    assert data[8:12] == b"WEBP", data[8:16]
+
+
+def assert_ico(data: bytes) -> None:
+    # ICO header: reserved=0, type=1, count>=1
+    assert len(data) >= 6
+    reserved, ico_type, count = struct.unpack("<HHH", data[:6])
+    assert reserved == 0
+    assert ico_type in (1, 2)
+    assert count >= 1
+
+
+def assert_raw_rgba(data: bytes, width: int, height: int) -> None:
+    assert len(data) == width * height * 4, (len(data), width, height)
+
+
+def raw_pixel(data: bytes, width: int, x: int, y: int) -> tuple[int, int, int, int]:
+    i = (y * width + x) * 4
+    return data[i], data[i + 1], data[i + 2], data[i + 3]
+
+
+def assert_near_rgb(
+    got: Sequence[int],
+    expected: Sequence[int],
+    *,
+    tol: int = 8,
+    label: str = "",
+) -> None:
+    assert len(got) >= 3 and len(expected) >= 3
+    for a, b in zip(got[:3], expected[:3]):
+        if abs(int(a) - int(b)) > tol:
+            raise AssertionError(f"{label} got={tuple(got[:3])} expected≈{tuple(expected[:3])} tol={tol}")
+
+
+# --- Minimal PNG (no Pillow) --------------------------------------------
+
+
+def solid_png_bytes(width: int, height: int, rgba: tuple[int, int, int, int] = (255, 0, 0, 255)) -> bytes:
+    """Encode a solid-color RGBA PNG without third-party deps."""
+    r, g, b, a = rgba
+    raw_rows = bytearray()
+    row = bytes([r, g, b, a]) * width
+    for _ in range(height):
+        raw_rows.append(0)  # filter None
+        raw_rows.extend(row)
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + tag
+            + data
+            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(bytes(raw_rows), 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+# --- HTML snippets ------------------------------------------------------
+
+
+def full_bleed(color: str, extra: str = "") -> str:
+    return (
+        f'<div style="width:100%;height:100%;background:{color};'
+        f'display:flex;align-items:center;justify-content:center;{extra}"></div>'
+    )
+
+
+def color_swatch_html() -> str:
+    """Absolute positioned RGB swatches for geometry tests (200×100)."""
+    return """
+    <div style="width:200px;height:100px;position:relative;background:#000000">
+      <div style="position:absolute;left:0;top:0;width:50px;height:50px;background:#ff0000"></div>
+      <div style="position:absolute;left:50px;top:0;width:50px;height:50px;background:#00ff00"></div>
+      <div style="position:absolute;left:100px;top:0;width:50px;height:50px;background:#0000ff"></div>
+      <div style="position:absolute;left:150px;top:0;width:50px;height:50px;background:#ffffff"></div>
+    </div>
+    """

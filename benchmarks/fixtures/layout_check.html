@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 600px;
+    height: 400px;
+    font-family: "Microsoft YaHei", sans-serif;
+    background: #111827;
+    color: white;
+  }
+  .root {
+    width: 600px;
+    height: 400px;
+    position: relative;
+    background: #111827;
+  }
+  /* Pure color anchors for pixel probes */
+  .swatch-red {
+    position: absolute;
+    left: 20px; top: 20px;
+    width: 80px; height: 80px;
+    background: #ef4444;
+  }
+  .swatch-green {
+    position: absolute;
+    left: 120px; top: 20px;
+    width: 80px; height: 80px;
+    background: #22c55e;
+  }
+  .swatch-blue {
+    position: absolute;
+    left: 220px; top: 20px;
+    width: 80px; height: 80px;
+    background: #3b82f6;
+  }
+  .bar {
+    position: absolute;
+    left: 20px; top: 130px;
+    width: 560px; height: 24px;
+    background: #1f2937;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    width: 70%;
+    height: 100%;
+    background: #f59e0b;
+  }
+  .row {
+    position: absolute;
+    left: 20px; right: 20px; top: 180px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .box {
+    width: 170px;
+    height: 90px;
+    background: #0f172a;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .title {
+    position: absolute;
+    left: 20px; bottom: 28px;
+    font-size: 22px;
+    color: #e5e7eb;
+  }
+</style>
+</head>
+<body>
+  <div class="root">
+    <div class="swatch-red"></div>
+    <div class="swatch-green"></div>
+    <div class="swatch-blue"></div>
+    <div class="bar"><div class="bar-fill"></div></div>
+    <div class="row">
+      <div class="box">A</div>
+      <div class="box">B</div>
+      <div class="box">C</div>
+    </div>
+    <div class="title">layout probe · flex row · absolute swatches</div>
+  </div>
+</body>
+</html>
