@@ -10,6 +10,8 @@ on:
       - "Cargo.lock"
       - "src/**"
       - "python/**"
+      - "scripts/**"
+      - "tests/**"
       - "vendor/**"
       - "pyproject.toml"
       - ".gitmodules"
@@ -21,8 +23,13 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_MIN_STACK: "8388608"
 
 jobs:
+  # -------------------------------------------------------------------------
+  # Linux: manylinux + musllinux. musl needs large pthread stacks (see
+  # scripts/cibw_test.py + src/lib.rs pthread_setattr_default_np).
+  # -------------------------------------------------------------------------
   linux:
     name: Linux wheels (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
@@ -42,36 +49,46 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install cibuildwheel
-        run: python -m pip install -U cibuildwheel
-      - name: Build
+          allow-prereleases: true
+      - name: Verify cibw test runner is present
+        run: test -f scripts/cibw_test.py && head -5 scripts/cibw_test.py
+      - name: Build & test wheels
+        uses: pypa/cibuildwheel@v3.2.0
         env:
-          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-* cp314-*
-          CIBW_SKIP: pp* *i686
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_BEFORE_ALL_LINUX: |
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
-          CIBW_ENVIRONMENT_LINUX: PATH=$HOME/.cargo/bin:$PATH
-          CIBW_TEST_REQUIRES: pytest markdown-it-py
-          CIBW_TEST_COMMAND: pytest {project}/tests -q
+          # Must not replace pyproject musl overrides entirely — only host PATH + stack.
+          # Test command is forced here so tags never re-run the old split import/pytest.
+          CIBW_ENVIRONMENT_LINUX: PATH=$HOME/.cargo/bin:$PATH RUST_MIN_STACK=8388608
+          CIBW_TEST_COMMAND: >
+            bash -c 'ulimit -s unlimited 2>/dev/null || ulimit -s 65536 2>/dev/null || true;
+            export CIBW_PROJECT={project};
+            python {project}/scripts/cibw_test.py'
           CIBW_BUILD_VERBOSITY: 1
-        run: python -m cibuildwheel --output-dir dist
+        with:
+          output-dir: dist
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.arch }}
           path: dist/*.whl
 
+  # -------------------------------------------------------------------------
+  # macOS: macos-13 is retired (no runners). Use macos-15-intel for x86_64
+  # and macos-14 (Apple Silicon) for arm64.
+  # https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down/
+  # -------------------------------------------------------------------------
   macos:
-    name: macOS wheels (${{ matrix.target }})
+    name: macOS wheels (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13
-            target: x86_64
+          - runner: macos-15-intel
+            arch: x86_64
           - runner: macos-14
-            target: aarch64
+            arch: arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,29 +101,33 @@ jobs:
         with:
           python-version: "3.12"
           allow-prereleases: true
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
+      - name: Build & test wheels
+        uses: pypa/cibuildwheel@v3.2.0
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_ENVIRONMENT: MACOSX_DEPLOYMENT_TARGET=11.0 RUST_MIN_STACK=8388608
+          CIBW_BUILD_VERBOSITY: 1
         with:
-          target: ${{ matrix.target }}
-          args: --release --out dist
-          manylinux: auto
-          command: build
+          output-dir: dist
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-${{ matrix.target }}
+          name: wheels-macos-${{ matrix.arch }}
           path: dist/*.whl
 
+  # -------------------------------------------------------------------------
+  # Windows: cibuildwheel arch ids AMD64 / ARM64.
+  # -------------------------------------------------------------------------
   windows:
-    name: Windows wheels (${{ matrix.target }})
+    name: Windows wheels (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: windows-latest
-            target: x64
+            arch: AMD64
           - runner: windows-11-arm
-            target: aarch64
+            arch: ARM64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -119,15 +140,17 @@ jobs:
         with:
           python-version: "3.12"
           allow-prereleases: true
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
+      - name: Build & test wheels
+        uses: pypa/cibuildwheel@v3.2.0
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_ENVIRONMENT: RUST_MIN_STACK=8388608
+          CIBW_BUILD_VERBOSITY: 1
         with:
-          target: ${{ matrix.target }}
-          args: --release --out dist
-          command: build
+          output-dir: dist
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-${{ matrix.target }}
+          name: wheels-windows-${{ matrix.arch }}
           path: dist/*.whl
 
   sdist:
@@ -172,6 +195,8 @@ jobs:
           mkdir -p dist
           find artifacts -type f \( -name '*.whl' -o -name '*.tar.gz' \) -exec cp {} dist/ \;
           ls -la dist
+          echo "--- wheel inventory ---"
+          ls -1 dist/*.whl | sed 's|.*/||' | sort
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

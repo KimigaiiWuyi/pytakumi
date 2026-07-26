@@ -14,7 +14,10 @@ use crate::error::{to_py_err, PyRes};
 ///
 /// Prefer this over raw dicts when the tree was produced by [`from_html`] so
 /// styles and presets stay intact without a JSON round-trip.
-#[pyclass(name = "NodeTree", module = "pytakumi")]
+///
+/// `frozen` + immutable tree: safe to share across Python threads (render clones
+/// the inner [`Node`]). Free-threaded CPython supported.
+#[pyclass(frozen, name = "NodeTree", module = "pytakumi")]
 #[derive(Clone)]
 pub struct NodeTree {
   pub(crate) node: Node,

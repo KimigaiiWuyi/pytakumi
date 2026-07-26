@@ -15,8 +15,13 @@ crate-type = ["cdylib"]
 
 [dependencies]
 arc-swap = "1"
+# pthread_setattr_default_np on musl — raise default stack for Python + Rust threads.
+libc = "0.2"
 pyo3 = { version = "0.25", features = ["extension-module"] }
 pythonize = "0.25"
+# Direct dep so we can configure the global pool stack size at import
+# (musl's default pthread stack is 128 KiB — too small for animation/webp).
+rayon = "1.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -43,7 +48,9 @@ default-features = false
 features = ["woff2", "woff", "svg"]
 
 [profile.release]
-lto = true
+# Thin LTO: fat LTO + codegen-units=1 produced multi-MB stack frames on
+# x86_64 musl (SIGSEGV under cibuildwheel even with raised RUST_MIN_STACK).
+lto = "thin"
 codegen-units = 1
 strip = true
 opt-level = 3

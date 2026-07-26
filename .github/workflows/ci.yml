@@ -13,6 +13,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Avoid rustup auto-reinstall races while resolving rust-toolchain.toml.
+  RUSTUP_PERMIT_COPY_RENAME: "1"
 
 jobs:
   lint-python:
@@ -38,6 +40,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          # Free-threaded 3.14t (no-GIL) — Linux only for runner availability.
+          - os: ubuntu-latest
+            python: "3.14t"
     steps:
       - name: Checkout (with engine submodule)
         uses: actions/checkout@v4
@@ -56,32 +62,90 @@ jobs:
         with:
           toolchain: "1.91.0"
 
+      - name: Show rustc
+        shell: bash
+        run: |
+          rustc -vV
+          cargo -vV
+          which rustc
+          echo "RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-}"
+
       - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
+          # setup-python recognizes 3.14t / free-threaded via the version string.
+
+      - name: Create virtualenv
+        run: python -m venv .venv
 
       - name: Install build & test deps
+        shell: bash
         run: |
+          if [ -f .venv/Scripts/activate ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           python -m pip install -U pip
           python -m pip install maturin pytest markdown-it-py pillow
 
-      - name: maturin develop --release
-        run: maturin develop --release
+      # Prefer build+pip over `maturin develop`: fewer rustup side-effects and
+      # closer to how users install wheels.
+      - name: Build wheel & install into venv
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f .venv/Scripts/activate ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          # Ensure the pinned toolchain from rust-toolchain.toml / dtolnay is used.
+          export CARGO="$(command -v cargo)"
+          export RUSTC="$(command -v rustc)"
+          rustc -vV
+          maturin build --release -o dist
+          python -m pip install dist/*.whl --force-reinstall
+          python -c "import pytakumi; print(pytakumi.__file__, pytakumi.__version__)"
 
       - name: Import smoke
-        run: python -c "import pytakumi; from pytakumi import html_to_pic, text_to_pic, md_to_pic, Renderer; print('pytakumi', pytakumi.__version__)"
+        shell: bash
+        run: |
+          if [ -f .venv/Scripts/activate ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          python -c "from pytakumi import html_to_pic, text_to_pic, md_to_pic, Renderer; import pytakumi; print('pytakumi', pytakumi.__version__)"
 
       - name: Pytest (product suite)
-        run: python -m pytest -q --tb=short
+        shell: bash
+        run: |
+          if [ -f .venv/Scripts/activate ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          python - <<'PY'
+          import sys
+          gil = getattr(sys, "_is_gil_enabled", None)
+          print("python", sys.version)
+          print("free_threaded", (not gil()) if callable(gil) else "unknown")
+          PY
+          python -m pytest -q --tb=short
 
       - name: Pytest count guard
         shell: bash
         run: |
+          if [ -f .venv/Scripts/activate ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           n=$(python -m pytest --collect-only -q | tail -n1 | awk '{print $1}')
           echo "collected=$n"
-          # Fail if the suite shrinks accidentally below product baseline.
           test "${n:-0}" -ge 80
 
   clippy:
@@ -99,7 +163,6 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-  # Lightweight sanity: one wheel on ubuntu for PR feedback without full matrix cost.
   wheel-smoke:
     name: Wheel smoke (linux x64, py3.12)
     runs-on: ubuntu-latest
@@ -120,9 +183,21 @@ jobs:
           args: --release --out dist -i python3.12
           manylinux: auto
           command: build
+          rust-toolchain: "1.91.0"
       - name: Install wheel & smoke
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install -U pip
-          python -m pip install dist/*.whl pytest markdown-it-py
-          python -c "from pytakumi import html_to_pic; b=html_to_pic('<div style=\"padding:20px\">ci</div>', width=200, height=80); assert b[:8]==b'\\x89PNG\\r\\n\\x1a\\n'"
-          pytest -q
+          python -m pip install dist/*.whl pytest markdown-it-py pillow
+          python - <<'PY'
+          import pytakumi
+          from pytakumi import html_to_pic
+          print("installed", pytakumi.__file__, pytakumi.__version__)
+          path = (pytakumi.__file__ or "").replace("\\", "/")
+          assert "site-packages" in path or "dist-packages" in path, path
+          b = html_to_pic('<div style="padding:20px">ci</div>', width=200, height=80)
+          assert b[:8] == b"\x89PNG\r\n\x1a\n", b[:16]
+          print("html_to_pic ok", len(b))
+          PY
+          python -m pytest -q --tb=short

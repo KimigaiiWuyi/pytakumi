@@ -22,6 +22,7 @@ def test_high_level_api_exported():
     assert callable(pytakumi.text_to_pic)
     assert callable(pytakumi.md_to_pic)
     assert callable(pytakumi.render_markdown)
+    assert pytakumi.supports_free_threading is True
 
 
 def test_unknown_attr_raises():

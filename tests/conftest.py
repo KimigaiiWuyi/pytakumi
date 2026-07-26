@@ -4,6 +4,24 @@ from pathlib import Path
 
 import pytest
 
+# Must run before any ThreadPoolExecutor in concurrency tests. On musl the
+# default pthread stack is 128 KiB — native render overflows it from Python
+# worker threads (import on the main thread still succeeds).
+try:
+    import threading
+
+    threading.stack_size(8 * 1024 * 1024)
+except (ValueError, RuntimeError, AttributeError):
+    pass
+
+# Package import also boosts stacks on musl; keep both for wheel-test isolation.
+try:
+    from pytakumi._stack import ensure_python_thread_stack
+
+    ensure_python_thread_stack(8 * 1024 * 1024)
+except Exception:
+    pass
+
 _ROOT = Path(__file__).resolve().parents[1]
 ENGINE_ROOT = _ROOT / "vendor" / "takumi"
 if not ENGINE_ROOT.is_dir():

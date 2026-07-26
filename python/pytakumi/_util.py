@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html as html_lib
 import re
+import threading
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -11,15 +12,21 @@ from pytakumi._native import Renderer
 
 _TEMPLATES = Path(__file__).resolve().parent / "templates"
 
-# Process-wide default renderer (lazy). Callers can still pass their own.
+# Process-wide default renderer (lazy). Double-checked locking so free-threaded
+# CPython does not race two constructors into the global slot.
 _default_renderer: Renderer | None = None
+_default_renderer_lock = threading.Lock()
 
 
 def default_renderer() -> Renderer:
     global _default_renderer
-    if _default_renderer is None:
-        _default_renderer = Renderer()
-    return _default_renderer
+    r = _default_renderer
+    if r is not None:
+        return r
+    with _default_renderer_lock:
+        if _default_renderer is None:
+            _default_renderer = Renderer()
+        return _default_renderer
 
 
 def load_template(name: str) -> str:

@@ -1,3 +1,6 @@
+# Pin the compiler only. Do NOT list clippy/rustfmt here: on CI, rustup may try
+# to reinstall those components and hit "detected conflict: bin/cargo-clippy"
+# (seen on macOS aarch64 and some Linux jobs). Install extra components via
+# `dtolnay/rust-toolchain` (or `rustup component add`) in the job that needs them.
 [toolchain]
 channel = "1.91.0"
-components = ["rustfmt", "clippy"]

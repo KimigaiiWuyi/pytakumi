@@ -6,8 +6,8 @@
 | --- | --- |
 | **Upstream engine** | [kane50613/takumi](https://github.com/kane50613/takumi) · docs [takumi.kane.tw/docs](https://takumi.kane.tw/docs/) |
 | **This repo** | PyO3 / maturin bindings + high-level helpers (`html_to_pic` / `text_to_pic` / `md_to_pic`) |
-| **Python** | 3.10 – 3.14 |
-| **Platforms** | Windows / macOS / Linux (x86_64 & ARM64 wheels via CI) |
+| **Python** | 3.10 – 3.14 (GIL) **and free-threaded 3.14t** (not 3.13t) |
+| **Platforms** | Windows / macOS / Linux (x86_64 & ARM64; manylinux **and** musllinux) |
 | **License** | MIT OR Apache-2.0 (same dual license as Takumi) |
 
 ```text
@@ -184,7 +184,8 @@ cd ../.. && git add vendor/takumi && git commit -m "chore: bump engine"
 maturin develop --release && pytest -q
 ```
 
-See [docs/SUBMODULE.md](./docs/SUBMODULE.md), [docs/PACKAGING.md](./docs/PACKAGING.md), [docs/FOOTPRINT.md](./docs/FOOTPRINT.md).
+维护者文档（结构 / CI / 交接 / 踩坑）：**[docs/README.md](./docs/README.md)**。  
+另见 [docs/SUBMODULE.md](./docs/SUBMODULE.md)、[docs/PACKAGING.md](./docs/PACKAGING.md)、[docs/FOOTPRINT.md](./docs/FOOTPRINT.md)。
 
 ---
 
@@ -219,7 +220,7 @@ pytest -q
 | Package exports | `test_package.py` |
 | … | plus markdown/nodes/svg/measure/util/legacy files |
 
-CI fails if collected tests drop below **80**. Still out of scope: full Chromium visual SSIM suite, free-threaded CPython, and live multi-arch green without pushing to GitHub.
+CI fails if collected tests drop below **80**. Free-threaded **3.14t** is supported (`gil_used=false`, shared `Renderer` is thread-safe; see `tests/test_concurrency.py`). Still out of scope: free-threaded **3.13t**, full Chromium visual SSIM, and multi-arch green without Actions.
 
 ### Benchmarks
 
@@ -235,16 +236,17 @@ Primary fixture: Desktop `stamina_card.html_test2.html` (1150×850). See [docs/B
 
 | Workflow | Purpose |
 | --- | --- |
-| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | Lint + **Ubuntu/Windows/macOS × Python 3.10–3.14** build (`maturin develop`) + `pytest`; Clippy |
-| [`.github/workflows/wheels.yml`](./.github/workflows/wheels.yml) | Multi-arch wheels (cibuildwheel Linux, maturin macOS/Windows) + sdist; **PyPI publish on `v*` tags** (Trusted Publishing) |
+| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | Lint + **Ubuntu/Windows/macOS × Python 3.10–3.14** (+ **Linux 3.14t**) source build + `pytest`; Clippy; Linux wheel smoke |
+| [`.github/workflows/wheels.yml`](./.github/workflows/wheels.yml) | **cibuildwheel**: CPython 3.10–3.14 **and cp314t** × (x86_64 & ARM64); Linux manylinux+musllinux; **each wheel is pytest’d**; sdist; **PyPI on `v*` tags** |
 
-Checkout uses **`submodules: recursive`** (no separate engine clone).
+| 文档 | 内容 |
+| --- | --- |
+| **[docs/CI.md](./docs/CI.md)** | 矩阵、Publish 条件、**关键配置清单** |
+| **[docs/PITFALLS.md](./docs/PITFALLS.md)** | musl 栈、tag、macos-13、Trusted Publisher 等踩坑 |
+| **[docs/HANDOVER.md](./docs/HANDOVER.md)** | 交接与发版步骤 |
+| [docs/PACKAGING.md](./docs/PACKAGING.md) | wheel / free-threaded / musl 技术细节 |
 
-Gaps to be aware of:
-
-- Publish job needs a GitHub `pypi` environment + Trusted Publisher config.
-- Some runners (e.g. Windows ARM) may be unavailable on free tiers.
-- Wheel jobs on every PR can be heavy; tag/`workflow_dispatch` is the practical release path.
+Checkout uses **`submodules: recursive`**. Publish needs GitHub Environment `pypi` + PyPI Trusted Publisher；**全部 matrix job 成功**后才会跑 Publish。
 
 ---
 

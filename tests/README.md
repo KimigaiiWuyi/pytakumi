@@ -18,7 +18,9 @@ Baseline: **≥ 100** collected tests; CI enforces `pytest --collect-only` count
 | `test_animation.py` | webp/gif/apng, dict scenes, NodeTree |
 | `test_measure.py` | measure tree shape |
 | `test_api_product.py` | html/text/md_to_pic product paths |
-| `test_concurrency.py` | thread-pool shared Renderer |
+| `test_concurrency.py` | Thread-safety: shared Renderer/NodeTree, font register vs paint, image/stylesheet cache, high-level APIs, error paths, raw-byte identity; free-threaded 3.14t stress |
+| `test_stack.py` | musl / `threading.stack_size` boost (Python worker stacks) |
+| `conftest.py` | Sets `threading.stack_size(8MiB)` before pools (musl 128KiB default) |
 | `test_markdown_unit.py` | MD→HTML without paint |
 | `test_util.py` | escape, templates, extract_styles |
 | `test_svg.py` | SVG backend |

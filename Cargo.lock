@@ -958,8 +958,10 @@ name = "pytakumi"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "libc",
  "pyo3",
  "pythonize",
+ "rayon",
  "serde",
  "serde_json",
  "takumi",

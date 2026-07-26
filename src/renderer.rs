@@ -27,7 +27,11 @@ pub(crate) struct RendererState {
 }
 
 /// Reusable Takumi renderer with font and resource caches.
-#[pyclass(name = "Renderer", module = "pytakumi")]
+///
+/// `frozen`: no `&mut self` methods; concurrent Python threads share one instance
+/// safely via `Arc` + `ArcSwap` (fonts) + `Mutex` (font registration) + the engine's
+/// thread-safe `ResourceCache` / glyph cache. Safe under free-threaded CPython.
+#[pyclass(frozen, name = "Renderer", module = "pytakumi")]
 pub struct Renderer {
   state: Arc<RendererState>,
 }

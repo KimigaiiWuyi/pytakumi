@@ -77,7 +77,9 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["python", "tests"]
+# Only `tests` for helpers — do NOT add `python/` or it shadows the installed
+# package and breaks imports of pytakumi._native in CI / wheel installs.
+pythonpath = ["tests"]
 addopts = "-ra --strict-markers"
 filterwarnings = [
   "error",
@@ -90,14 +92,35 @@ markers = [
 ]
 
 [tool.cibuildwheel]
-build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
-skip = "pp* *-musllinux_i686 *-manylinux_i686 *win32 *i686"
+# CPython 3.10–3.14 (GIL) plus free-threaded 3.14t only (not experimental 3.13t).
+# Module is declared `gil_used = false`; shared Renderer is thread-safe.
+enable = ["cpython-freethreading"]
+build = "cp310-* cp311-* cp312-* cp313-* cp314-* cp314t-*"
+# Skip PyPy, 32-bit, free-threaded 3.13t only. musllinux is built and tested.
+skip = "pp* *-musllinux_i686 *-manylinux_i686 *win32 *i686 cp313t-*"
+# Every produced wheel is installed into a clean venv and fully pytest'd
+# (includes concurrency / free-threaded stress in tests/test_concurrency.py).
 test-requires = "pytest markdown-it-py"
 test-command = "pytest {project}/tests -q"
+# Host-side env for macOS/Windows (Linux containers use [tool.cibuildwheel.linux]).
+environment = { RUST_MIN_STACK = "8388608" }
 
 [tool.cibuildwheel.linux]
+# manylinux + musllinux. Container needs its own Rust install.
 before-all = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0"
-environment = { PATH = "$HOME/.cargo/bin:$PATH" }
+# RUST_MIN_STACK: Rust/Rayon. Python stacks: scripts/cibw_test.py + _stack +
+# pthread_setattr_default_np in the native module (musl default is 128 KiB).
+environment = { PATH = "$HOME/.cargo/bin:$PATH", RUST_MIN_STACK = "8388608" }
+# Single process: stack setup + render/animation smoke + full pytest.
+test-command = "bash -c 'ulimit -s unlimited 2>/dev/null || ulimit -s 65536 2>/dev/null || true; export CIBW_PROJECT={project}; python {project}/scripts/cibw_test.py'"
+
+# musl: no LTO + opt-level 2 (smaller stack frames than release LTO).
+[[tool.cibuildwheel.overrides]]
+select = "*-musllinux_*"
+environment = { PATH = "$HOME/.cargo/bin:$PATH", RUST_MIN_STACK = "8388608", CARGO_PROFILE_RELEASE_LTO = "false", CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "16", CARGO_PROFILE_RELEASE_OPT_LEVEL = "2" }
 
 [tool.cibuildwheel.macos]
-environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0", RUST_MIN_STACK = "8388608" }
+
+[tool.cibuildwheel.windows]
+environment = { RUST_MIN_STACK = "8388608" }

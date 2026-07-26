@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+# Raise Python thread stacks on musl *before* any ThreadPoolExecutor work.
+# (RUST_MIN_STACK / Rayon only affect Rust threads — not Python workers.)
+from pytakumi._stack import ensure_for_runtime as _ensure_thread_stacks
+
+_ensure_thread_stacks()
+
 from pytakumi._native import (
     NodeTree,
     Renderer,
@@ -14,6 +20,7 @@ from pytakumi._native import (
     render,
     render_html,
     set_glyph_cache_max_bytes,
+    supports_free_threading,
     text_node,
 )
 from pytakumi.api import html_to_pic, md_to_pic, text_to_pic
@@ -33,6 +40,7 @@ __all__ = [
     "render_html",
     "render_markdown",
     "set_glyph_cache_max_bytes",
+    "supports_free_threading",
     "text_node",
     "text_to_pic",
     "wrap_markdown_html",
