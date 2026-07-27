@@ -53,3 +53,58 @@ def test_wrap_markdown_body_class():
 def test_empty_markdown():
     html = markdown_to_html("")
     assert isinstance(html, str)
+
+
+def test_arch_review_fixture_checklist():
+    """Source-level checklist for the md_to_pic stress fixture (no paint)."""
+    from pathlib import Path
+
+    from helpers import assert_arch_review_md_checklist
+
+    md = (Path(__file__).resolve().parent / "fixtures" / "arch_review_auth.md").read_text(
+        encoding="utf-8"
+    )
+    counts = assert_arch_review_md_checklist(md)
+    assert counts["inline_code"] >= 10
+    assert counts["bold"] >= 3 and counts["em"] >= 3 and counts["strike"] >= 3
+
+
+def test_gfm_tables_rewritten_to_flex():
+    """GFM tables become flex markup (Takumi has no CSS table layout)."""
+    from pytakumi.markdown import markdown_to_html, rewrite_tables_for_takumi
+
+    md = """
+| A | B | C |
+| --- | --- | --- |
+| 1 | 2 | 3 |
+| **x** | `y` | z |
+"""
+    html = markdown_to_html(md)
+    assert "md-table" in html
+    assert "md-table-row" in html
+    assert "md-table-cell" in html
+    assert "<table" not in html
+    assert "<strong>" in html or "x" in html
+    # rewrite is idempotent on already-converted markup
+    assert rewrite_tables_for_takumi(html) == html
+
+
+def test_mermaid_and_math_stay_literal():
+    """Mermaid/math are not executed — remain code/text (no browser JS)."""
+    md = """
+```mermaid
+flowchart TD
+    A --> B
+```
+
+inline $E = mc^2$
+
+$$
+\\int_0^\\infty e^{-x^2} dx
+$$
+"""
+    html = markdown_to_html(md)
+    assert "language-mermaid" in html
+    assert "flowchart TD" in html
+    assert "$E = mc^2$" in html
+    assert "int_0" in html or r"\int_0" in html

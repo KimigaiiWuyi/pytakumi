@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping, Sequence
 
 # Re-export high-level API for backwards compatibility.
@@ -14,18 +15,81 @@ def markdown_to_html(source: str, *, renderer: str | None = None) -> str:
     Uses ``markdown-it-py`` when installed (``pip install pytakumi[markdown]``).
     Falls back to a tiny built-in converter for headings, paragraphs, lists,
     code fences, and emphasis so tests work without optional deps.
+
+    Post-processes GFM ``<table>`` into flex markup because the Takumi layout
+    engine does not implement CSS table layout (``display: table`` / ``table-cell``).
+
+    **Not supported as rich render** (left as code/text by design, no browser JS):
+
+    - Mermaid fenced blocks (`` ```mermaid ``) → ``<pre><code class="language-mermaid">``
+    - Math (``$...$`` / ``$$...$$``) → plain text; no KaTeX/MathJax
     """
     try:
         from markdown_it import MarkdownIt
     except ImportError:
-        return _simple_markdown_to_html(source)
+        return rewrite_tables_for_takumi(_simple_markdown_to_html(source))
 
     md = MarkdownIt(renderer or "commonmark", {"html": False, "linkify": False})
     try:
         md = md.enable("strikethrough").enable("table")
     except Exception:
         pass
-    return md.render(source)
+    return rewrite_tables_for_takumi(md.render(source))
+
+
+def rewrite_tables_for_takumi(html: str) -> str:
+    """Rewrite ``<table>…</table>`` into flex-row markup Takumi can paint.
+
+    Upstream GitHub-ish CSS uses ``table { display: block }`` (scroll wrapper).
+    Combined with no CSS table layout in the engine, native ``<table>`` collapses
+    into a single inline run of cell text. Flex rows restore a readable grid.
+    """
+    if "<table" not in html:
+        return html
+
+    def _cell_htmls(row_inner: str) -> list[str]:
+        return re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row_inner, flags=re.I | re.S)
+
+    def _repl_table(match: re.Match[str]) -> str:
+        table = match.group(0)
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", table, flags=re.I | re.S)
+        if not rows:
+            return table
+
+        parsed: list[tuple[list[str], bool]] = []
+        for row in rows:
+            cells = _cell_htmls(row)
+            if not cells:
+                continue
+            is_header = bool(re.search(r"<th\b", row, flags=re.I))
+            parsed.append((cells, is_header))
+        if not parsed:
+            return table
+
+        n_cols = max(len(c) for c, _ in parsed)
+        if n_cols == 0:
+            return table
+
+        parts = ['<div class="md-table" role="table">']
+        for r_i, (cells, is_header) in enumerate(parsed):
+            # pad short rows
+            while len(cells) < n_cols:
+                cells.append("")
+            row_cls = "md-table-row md-table-header" if is_header else "md-table-row"
+            if not is_header and r_i % 2 == 0:
+                row_cls += " md-table-row-alt"
+            parts.append(f'<div class="{row_cls}" role="row">')
+            for c_i, cell in enumerate(cells):
+                cell_cls = "md-table-cell md-table-th" if is_header else "md-table-cell"
+                if c_i < n_cols - 1:
+                    cell_cls += " md-table-cell-border"
+                parts.append(f'<div class="{cell_cls}" role="cell">{cell}</div>')
+            parts.append("</div>")
+        parts.append("</div>")
+        return "".join(parts)
+
+    # Non-greedy, non-nested tables (markdown-it output is flat).
+    return re.sub(r"<table\b[^>]*>.*?</table>", _repl_table, html, flags=re.I | re.S)
 
 
 def _simple_markdown_to_html(source: str) -> str:

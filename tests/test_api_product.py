@@ -104,6 +104,70 @@ x = 1
     assert h > 200
 
 
+def test_md_to_pic_table_is_not_collapsed(renderer):
+    """GFM tables must paint as multi-row flex grid, not one inline run."""
+    from pathlib import Path
+
+    from pytakumi import md_to_pic
+
+    md = """
+| A | B | C |
+| --- | --- | --- |
+| 1 | 2 | 3 |
+| 4 | 5 | 6 |
+| 7 | 8 | 9 |
+"""
+    fonts = None
+    font_families = None
+    yahei = Path(r"C:\Windows\Fonts\msyh.ttc")
+    if yahei.is_file():
+        fonts = [{"data": yahei.read_bytes(), "name": "msyh"}]
+        font_families = ["msyh"]
+
+    png = md_to_pic(
+        md,
+        width=480,
+        renderer=renderer,
+        fonts=fonts,
+        font_families=font_families,
+    )
+    w, h = assert_png(png)
+    assert w == 480
+    # Collapsed single-line table was ~100–120px tall; flex grid is much taller.
+    assert h > 160, f"table appears collapsed: height={h}"
+
+
+def test_md_to_pic_arch_review_fixture(renderer):
+    """Stress md_to_pic with a full Chinese architecture-review document.
+
+    Fixture must satisfy the full GFM checklist in
+    :func:`helpers.assert_arch_review_md_checklist` (H2/H3, multi-lang fences,
+    line-cite, tables, mermaid, lists, quotes, emphasis, links, math, NOTE…).
+    """
+    from pathlib import Path
+
+    from helpers import assert_arch_review_md_checklist
+    from pytakumi import md_to_pic
+
+    fixture = Path(__file__).resolve().parent / "fixtures" / "arch_review_auth.md"
+    md = fixture.read_text(encoding="utf-8")
+    line_count = len(md.splitlines())
+    # Target ~80–120 lines; allow small slack for multi-line code/mermaid.
+    assert 80 <= line_count <= 180, f"fixture line count out of band: {line_count}"
+
+    counts = assert_arch_review_md_checklist(md)
+    assert counts["h2"] >= 3 and counts["h3"] >= 4
+
+    png = md_to_pic(md, width=900, renderer=renderer)
+    w, h = assert_png(png)
+    assert w == 900
+    # Long doc → tall image when height is auto
+    assert h > 800
+
+    dark = md_to_pic(md, width=900, height=2800, dark=True, renderer=renderer)
+    assert_png(dark, width=900, height=2800)
+
+
 def test_md_to_pic_dark_fixed_size(renderer):
     from pytakumi import md_to_pic
 

@@ -115,13 +115,42 @@
   background: transparent;
 }
 
-.markdown-body table {
-  border-collapse: collapse;
+/* Native <table> is rewritten to .md-table flex rows in markdown.py.
+   Takumi has no CSS table layout; keep both selectors for safety. */
+.markdown-body table,
+.markdown-body .md-table {
   width: 100%;
   margin-top: 0;
   margin-bottom: 16px;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d1d9e0;
+  border-radius: 6px;
   overflow: hidden;
+}
+.markdown-body .md-table-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  border-top: 1px solid #d1d9e0;
+}
+.markdown-body .md-table-row:first-child {
+  border-top: none;
+}
+.markdown-body .md-table-header {
+  font-weight: 600;
+  background: #f6f8fa;
+}
+.markdown-body .md-table-row-alt {
+  background: #f6f8fa80;
+}
+.markdown-body .md-table-cell {
+  flex: 1 1 0;
+  padding: 6px 13px;
+  min-width: 0;
+}
+.markdown-body .md-table-cell-border {
+  border-right: 1px solid #d1d9e0;
 }
 .markdown-body th,
 .markdown-body td {
@@ -132,8 +161,11 @@
   font-weight: 600;
   background: #f6f8fa;
 }
-.markdown-body tr:nth-child(2n) {
-  background: #f6f8fa80;
+
+/* Mermaid / math: not executed; show as intentional code-ish blocks */
+.markdown-body pre code.language-mermaid {
+  display: block;
+  color: #1f2328;
 }
 
 .markdown-body img {
