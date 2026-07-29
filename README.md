@@ -59,7 +59,7 @@ Engine pin lives at `vendor/takumi` — see [docs/SUBMODULE.md](./docs/SUBMODULE
 
 ### High-level helpers (recommended)
 
-```python
+````python
 from pytakumi import html_to_pic, text_to_pic, md_to_pic
 
 # 1) HTML fragment → PNG
@@ -104,7 +104,7 @@ print("hi")
         width=800,
     )
 )
-```
+````
 
 ### Low-level `Renderer` (cache reuse)
 
