@@ -219,6 +219,7 @@ def html_to_pic(
     draw_debug_border: bool = False,
     max_depth: int | None = None,
     use_presets: bool = True,
+    overflow: Literal["hidden", "visible"] = "hidden",
 ) -> bytes: ...
 
 def text_to_pic(
@@ -240,6 +241,7 @@ def text_to_pic(
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
+    overflow: Literal["hidden", "visible"] = "hidden",
 ) -> bytes: ...
 
 def md_to_pic(
@@ -259,6 +261,7 @@ def md_to_pic(
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
+    overflow: Literal["hidden", "visible"] = "hidden",
 ) -> bytes: ...
 
 def render_markdown(
@@ -277,6 +280,7 @@ def render_markdown(
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
     dark: bool = False,
+    overflow: Literal["hidden", "visible"] = "hidden",
 ) -> bytes: ...
 
 def markdown_to_html(source: str, *, renderer: str | None = None) -> str: ...

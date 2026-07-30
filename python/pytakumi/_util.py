@@ -78,29 +78,82 @@ def resolve_renderer(
     return default_renderer()
 
 
-def extract_styles_and_body(html: str, width: int | None, height: int | None) -> tuple[list[str], str]:
-    """Pull <style> blocks out and wrap body content for Takumi."""
+def normalize_device_pixel_ratio(device_pixel_ratio: float | None) -> float:
+    """Validate a caller-supplied device pixel ratio.
+
+    ``None`` means the engine default (1.0). Zero, negative, and non-finite
+    values are rejected because the CSS viewport is computed as
+    ``device_size / ratio``; an invalid ratio would produce nonsensical CSS
+    sizes instead of a clear caller error.
+    """
+    if device_pixel_ratio is None:
+        return 1.0
+    ratio = float(device_pixel_ratio)
+    if ratio <= 0.0 or ratio != ratio or ratio == float("inf"):
+        raise ValueError("device_pixel_ratio must be a positive finite number")
+    return ratio
+
+
+def extract_styles_and_body(
+    html: str,
+    width: int | None,
+    height: int | None,
+    device_pixel_ratio: float | None = None,
+    overflow: str = "hidden",
+) -> tuple[list[str], str]:
+    """Pull <style> blocks out and wrap body content for Takumi.
+
+    ``width`` / ``height`` are *device* pixels, matching ``Renderer.render_html``.
+    The injected root wrapper is laid out in CSS pixels, and Takumi's CSS
+    viewport equals ``size / device_pixel_ratio``. When a high-DPI ratio is
+    active the wrapper size is therefore scaled down by the same ratio; forcing
+    it to the raw device-pixel value would overflow the viewport and clip the
+    right/bottom edge of the content.
+
+    ``overflow`` controls the root wrapper clipping behavior. ``hidden`` keeps
+    fixed-size renders predictable; ``visible`` lets content paint outside the
+    root box when the caller explicitly wants it.
+    """
+    if overflow not in ("hidden", "visible"):
+        raise ValueError("overflow must be 'hidden' or 'visible'")
+
     styles = re.findall(r"<style[^>]*>(.*?)</style>", html, flags=re.I | re.S)
     body_m = re.search(r"<body[^>]*>(.*?)</body>", html, flags=re.I | re.S)
     body = body_m.group(1) if body_m else html
     body = re.sub(r"<script[^>]*>.*?</script>", "", body, flags=re.I | re.S)
     body = re.sub(r"<style[^>]*>.*?</style>", "", body, flags=re.I | re.S)
 
+    dpr = normalize_device_pixel_ratio(device_pixel_ratio)
+
+    def _css_px(value: int | None) -> str | None:
+        if value is None:
+            return None
+        css = value / dpr
+        if float(css).is_integer():
+            return str(int(css))
+        return f"{css:g}"
+
     size_bits = []
-    if width is not None:
-        size_bits.append(f"width:{int(width)}px")
-    if height is not None:
-        size_bits.append(f"height:{int(height)}px")
+    css_width = _css_px(width)
+    if css_width is not None:
+        size_bits.append(f"width:{css_width}px")
+    css_height = _css_px(height)
+    if css_height is not None:
+        size_bits.append(f"height:{css_height}px")
     size_css = ";".join(size_bits)
     if size_css:
         size_css += ";"
 
     for i, sheet in enumerate(styles):
-        styles[i] = re.sub(r"(?m)(^|[,\s])body(\s*[,{])", r"\1.pytakumi-root\2", sheet)
+        styles[i] = re.sub(
+            r"(?m)(^|[,\s])(?:html|body)(\s*[,{])",
+            r"\1.pytakumi-root\2",
+            sheet,
+        )
         styles[i] = re.sub(r"@import\s+url\([^)]+\)\s*;?", "", styles[i], flags=re.I)
 
     wrapped = (
         f'<div class="pytakumi-root" style="{size_css}box-sizing:border-box;'
-        f'position:relative;overflow:hidden">{body}</div>'
+        f'position:relative;overflow:{overflow}">{body}</div>'
     )
     return styles, wrapped

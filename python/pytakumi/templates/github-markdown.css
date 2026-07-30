@@ -152,6 +152,15 @@
 .markdown-body .md-table-cell-border {
   border-right: 1px solid #d1d9e0;
 }
+.markdown-body .md-table-cell-left {
+  text-align: left;
+}
+.markdown-body .md-table-cell-right {
+  text-align: right;
+}
+.markdown-body .md-table-cell-center {
+  text-align: center;
+}
 .markdown-body th,
 .markdown-body td {
   border: 1px solid #d1d9e0;

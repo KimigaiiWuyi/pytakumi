@@ -39,18 +39,23 @@ def html_to_pic(
     draw_debug_border: bool = False,
     max_depth: int | None = None,
     use_presets: bool = True,
+    overflow: str = "hidden",
 ) -> bytes:
     """Render an HTML fragment/document to image bytes.
 
     ``<style>`` blocks inside ``html`` are extracted and applied. Optional
-    ``stylesheets`` / ``css`` are appended.
+    ``stylesheets`` / ``css`` are appended. ``<link rel="stylesheet">`` is not
+    fetched; use ``<style>``, ``stylesheets=``, or ``css=`` instead.
 
     Parameters
     ----------
     html:
         HTML markup (full document or fragment).
     width / height:
-        Viewport size. Omit ``height`` to size to content when supported.
+        Output image size in **device pixels**. The CSS layout viewport is
+        ``size / device_pixel_ratio``. Example: ``width=1600`` with
+        ``device_pixel_ratio=2`` lays out as ``800px`` CSS width. Omit
+        ``height`` to size the image to content height.
     format:
         ``png`` (default), ``jpeg``, ``webp``, ``ico``, or ``raw``.
     fonts:
@@ -58,9 +63,18 @@ def html_to_pic(
         on the renderer before paint.
     renderer:
         Reuse a :class:`Renderer` to share caches across calls.
+    overflow:
+        Root wrapper overflow: ``hidden`` (default) clips content that exceeds
+        the fixed box; ``visible`` disables clipping.
     """
     r = resolve_renderer(renderer, fonts)
-    extracted, body = extract_styles_and_body(html, width, height)
+    extracted, body = extract_styles_and_body(
+        html,
+        width,
+        height,
+        device_pixel_ratio=device_pixel_ratio,
+        overflow=overflow,
+    )
     sheets = list(extracted)
     if stylesheets:
         sheets.extend(stylesheets)
@@ -104,6 +118,7 @@ def text_to_pic(
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
+    overflow: str = "hidden",
 ) -> bytes:
     """Render plain text with a card template (not raw HTML).
 
@@ -115,9 +130,13 @@ def text_to_pic(
         Optional header/meta lines.
     theme:
         ``dark`` (default) or ``light``.
-    height:
-        Fixed height, or ``None`` to grow with content (defaults to a
-        comfortable minimum via padding when omitted).
+    width / height:
+        Output image size in **device pixels**. The CSS layout viewport is
+        ``size / device_pixel_ratio``. Omit ``height`` to size the card to
+        content height; the template keeps a 360 CSS px minimum height.
+    overflow:
+        Root wrapper overflow: ``hidden`` (default) clips content that exceeds
+        the fixed box; ``visible`` disables clipping.
     """
     root_class = "text-card light" if theme == "light" else "text-card"
     blocks: list[str] = [f'<div class="{root_class}">']
@@ -138,13 +157,10 @@ def text_to_pic(
     if css:
         sheets.append(css)
 
-    # Default height gives a poster-like frame when not specified.
-    h = height if height is not None else max(360, 200 + text.count("\n") * 28)
-
     return html_to_pic(
         html,
         width=width,
-        height=h,
+        height=height,
         format=format,
         quality=quality,
         lossless=lossless,
@@ -154,6 +170,7 @@ def text_to_pic(
         device_pixel_ratio=device_pixel_ratio,
         font_families=font_families,
         lang=lang,
+        overflow=overflow,
     )
 
 
@@ -174,11 +191,22 @@ def md_to_pic(
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
+    overflow: str = "hidden",
 ) -> bytes:
     """Render Markdown as a GitHub-README-style document image.
 
     Uses ``markdown-it-py`` when installed (``pip install pytakumi[markdown]``),
     otherwise a built-in subset converter.
+
+    Parameters
+    ----------
+    width / height:
+        Output image size in **device pixels**. The CSS layout viewport is
+        ``size / device_pixel_ratio``. Omit ``height`` to size the document to
+        content height.
+    overflow:
+        Root wrapper overflow: ``hidden`` (default) clips content that exceeds
+        a fixed box; ``visible`` disables clipping.
     """
     body_html = markdown_to_html(md)
     html = wrap_markdown_html(body_html)
@@ -205,4 +233,5 @@ def md_to_pic(
         device_pixel_ratio=device_pixel_ratio,
         font_families=font_families,
         lang=lang,
+        overflow=overflow,
     )

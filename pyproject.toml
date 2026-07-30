@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pytakumi"
-version = "0.1.1"
+version = "0.1.2"
 description = "Render HTML, Markdown, and node trees to images without a browser (Takumi Python bindings)."
 readme = "README.md"
 requires-python = ">=3.10"

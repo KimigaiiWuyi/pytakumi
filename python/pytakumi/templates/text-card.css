@@ -2,7 +2,7 @@
 .text-card {
   box-sizing: border-box;
   width: 100%;
-  min-height: 100%;
+  min-height: 360px;
   padding: 48px 56px;
   background: #0f172a;
   color: #f8fafc;

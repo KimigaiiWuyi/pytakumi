@@ -30,11 +30,79 @@ def markdown_to_html(source: str, *, renderer: str | None = None) -> str:
         return rewrite_tables_for_takumi(_simple_markdown_to_html(source))
 
     md = MarkdownIt(renderer or "commonmark", {"html": False, "linkify": False})
-    try:
-        md = md.enable("strikethrough").enable("table")
-    except Exception:
-        pass
+    for plugin in ("strikethrough", "table"):
+        try:
+            md = md.enable(plugin)
+        except ValueError:
+            # Preset lacks the plugin; keep rendering with available syntax.
+            pass
     return rewrite_tables_for_takumi(md.render(source))
+
+
+_ALIGN_BY_MARKER = {
+    "left": "md-table-cell-left",
+    "right": "md-table-cell-right",
+    "center": "md-table-cell-center",
+}
+
+
+def _cell_align_from_attrs(cell_open_tag: str) -> str | None:
+    """Extract alignment from a ``<th>/<td>`` tag.
+
+    markdown-it emits GFM alignment as ``style="text-align:left"``. Raw GFM
+    delimiter markers (``:---``) are also recognized for non-markdown-it tables.
+    """
+    style = re.search(r'style\s*=\s*["\'][^"\']*text-align\s*:\s*(left|right|center)', cell_open_tag, flags=re.I)
+    if style:
+        return style.group(1).lower()
+
+    text = re.sub(r"<[^>]+>", "", cell_open_tag).strip()
+    left = text.startswith(":")
+    right = text.endswith(":")
+    if left and right:
+        return "center"
+    if right:
+        return "right"
+    if left:
+        return "left"
+    return None
+
+
+def _column_alignments(rows: list[tuple[list[tuple[str, str]], bool]]) -> list[str | None]:
+    """Infer per-column alignment from explicit cell attributes.
+
+    Prefers the first row with any explicit alignment (usually the header);
+    falls back to the first body row when headers are unstyled.
+    """
+    n_cols = max((len(cells) for cells, _ in rows), default=0)
+    aligns: list[str | None] = [None] * n_cols
+
+    ordered = [cells for cells, is_header in rows if is_header]
+    ordered.extend(cells for cells, is_header in rows if not is_header)
+    for cells in ordered:
+        changed = False
+        for idx, (open_tag, _cell_html) in enumerate(cells):
+            if idx >= n_cols or aligns[idx] is not None:
+                continue
+            align = _cell_align_from_attrs(open_tag)
+            if align is not None:
+                aligns[idx] = align
+                changed = True
+        if changed and all(a is not None for a in aligns):
+            break
+    return aligns
+
+
+def _cell_is_numeric(cell_html: str) -> bool:
+    """Best-effort numeric detection for default right alignment."""
+    text = re.sub(r"<[^>]+>", "", cell_html)
+    text = re.sub(r"&[a-zA-Z]+;|&#\d+;", "", text).strip()
+    if not text:
+        return False
+    return bool(
+        re.fullmatch(r"[+\-]?[\d,]*\.?\d+(?:[eE][+\-]?\d+)?[%‰]?", text)
+        or re.fullmatch(r"[+\-]?\(?\d[\d,]*\.?\d*\)?", text)
+    )
 
 
 def rewrite_tables_for_takumi(html: str) -> str:
@@ -47,8 +115,13 @@ def rewrite_tables_for_takumi(html: str) -> str:
     if "<table" not in html:
         return html
 
-    def _cell_htmls(row_inner: str) -> list[str]:
-        return re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row_inner, flags=re.I | re.S)
+    def _cell_pairs(row_inner: str) -> list[tuple[str, str]]:
+        return [
+            (open_tag, inner)
+            for open_tag, inner in re.findall(
+                r"(<t[hd][^>]*>)(.*?)</t[hd]>", row_inner, flags=re.I | re.S
+            )
+        ]
 
     def _repl_table(match: re.Match[str]) -> str:
         table = match.group(0)
@@ -56,9 +129,9 @@ def rewrite_tables_for_takumi(html: str) -> str:
         if not rows:
             return table
 
-        parsed: list[tuple[list[str], bool]] = []
+        parsed: list[tuple[list[tuple[str, str]], bool]] = []
         for row in rows:
-            cells = _cell_htmls(row)
+            cells = _cell_pairs(row)
             if not cells:
                 continue
             is_header = bool(re.search(r"<th\b", row, flags=re.I))
@@ -70,17 +143,28 @@ def rewrite_tables_for_takumi(html: str) -> str:
         if n_cols == 0:
             return table
 
+        aligns = _column_alignments(parsed)
+        while len(aligns) < n_cols:
+            aligns.append(None)
+
         parts = ['<div class="md-table" role="table">']
         for r_i, (cells, is_header) in enumerate(parsed):
             # pad short rows
             while len(cells) < n_cols:
-                cells.append("")
+                cells.append(("<td>", ""))
             row_cls = "md-table-row md-table-header" if is_header else "md-table-row"
             if not is_header and r_i % 2 == 0:
                 row_cls += " md-table-row-alt"
             parts.append(f'<div class="{row_cls}" role="row">')
-            for c_i, cell in enumerate(cells):
+            for c_i, (open_tag, cell) in enumerate(cells):
                 cell_cls = "md-table-cell md-table-th" if is_header else "md-table-cell"
+                align = aligns[c_i]
+                if align is None:
+                    align = _cell_align_from_attrs(open_tag)
+                if align is None and not is_header and _cell_is_numeric(cell):
+                    align = "right"
+                if align is not None:
+                    cell_cls += f" {_ALIGN_BY_MARKER[align]}"
                 if c_i < n_cols - 1:
                     cell_cls += " md-table-cell-border"
                 parts.append(f'<div class="{cell_cls}" role="cell">{cell}</div>')
@@ -223,6 +307,7 @@ def render_markdown(
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
     dark: bool = False,
+    overflow: str = "hidden",
 ) -> bytes:
     """Legacy alias for :func:`takumi.md_to_pic` (GitHub-style template)."""
     from pytakumi.api import md_to_pic
@@ -242,4 +327,5 @@ def render_markdown(
         device_pixel_ratio=device_pixel_ratio,
         font_families=font_families,
         lang=lang,
+        overflow=overflow,
     )

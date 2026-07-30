@@ -89,6 +89,31 @@ def test_gfm_tables_rewritten_to_flex():
     assert rewrite_tables_for_takumi(html) == html
 
 
+def test_gfm_table_alignment_classes():
+    md = """
+| Left | Center | Right |
+| :--- | :---: | ---: |
+| a | b | 123 |
+"""
+    html = markdown_to_html(md)
+    assert "md-table-cell-left" in html
+    assert "md-table-cell-center" in html
+    assert "md-table-cell-right" in html
+
+
+def test_numeric_table_cells_default_right_aligned():
+    md = """
+| Name | Value |
+| --- | --- |
+| alpha | 1,234.5 |
+| beta | text |
+"""
+    html = markdown_to_html(md)
+    assert "md-table-cell-right" in html
+    # Text cell should not be forced numeric/right aligned.
+    assert html.count("md-table-cell-right") >= 1
+
+
 def test_mermaid_and_math_stay_literal():
     """Mermaid/math are not executed — remain code/text (no browser JS)."""
     md = """

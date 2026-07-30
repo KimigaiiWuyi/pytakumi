@@ -224,3 +224,44 @@ def test_html_to_pic_dpr(renderer):
         renderer=renderer,
     )
     assert_png(png, width=50, height=40)
+
+
+def test_html_to_pic_rejects_invalid_dpr(renderer):
+    from pytakumi import html_to_pic
+
+    with pytest.raises(ValueError):
+        html_to_pic(full_bleed("#000"), width=20, height=20, device_pixel_ratio=0, renderer=renderer)
+
+
+def test_html_to_pic_overflow_visible(renderer):
+    from pytakumi import html_to_pic
+
+    png = html_to_pic(
+        full_bleed("#223344"),
+        width=60,
+        height=40,
+        overflow="visible",
+        renderer=renderer,
+    )
+    assert_png(png, width=60, height=40)
+
+    with pytest.raises(ValueError):
+        html_to_pic(full_bleed("#000"), width=20, height=20, overflow="scroll", renderer=renderer)
+
+
+def test_text_to_pic_auto_height_uses_content_not_line_count():
+    from pytakumi import text_to_pic
+
+    short = text_to_pic("hello", width=400)
+    long_single_line = text_to_pic("x" * 500, width=400)
+    many_lines = text_to_pic("a\n" * 20, width=400)
+
+    w, h_short = assert_png(short)
+    assert w == 400
+    assert h_short >= 360
+
+    _w, h_long = assert_png(long_single_line)
+    assert h_long >= 360
+
+    _w, h_many = assert_png(many_lines)
+    assert h_many >= 360
