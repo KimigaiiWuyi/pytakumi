@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 from pytakumi._native import Renderer
+
+Format = Literal["png", "jpeg", "jpg", "webp", "ico", "raw"]
 from pytakumi._util import (
     escape,
     extract_styles_and_body,
@@ -17,6 +20,7 @@ __all__ = [
     "html_to_pic",
     "text_to_pic",
     "md_to_pic",
+    "render_markdown",
 ]
 
 
@@ -25,7 +29,7 @@ def html_to_pic(
     *,
     width: int = 800,
     height: int | None = None,
-    format: str = "png",
+    format: Format = "png",
     quality: int | None = None,
     lossless: bool | None = None,
     stylesheets: Sequence[str] | None = None,
@@ -108,7 +112,7 @@ def text_to_pic(
     eyebrow: str | None = None,
     footer: str | None = None,
     theme: str = "dark",
-    format: str = "png",
+    format: Format = "png",
     quality: int | None = None,
     lossless: bool | None = None,
     css: str | None = None,
@@ -179,7 +183,7 @@ def md_to_pic(
     *,
     width: int = 800,
     height: int | None = None,
-    format: str = "png",
+    format: Format = "png",
     quality: int | None = None,
     lossless: bool | None = None,
     dark: bool = False,
@@ -229,6 +233,44 @@ def md_to_pic(
         stylesheets=sheets,
         images=images,
         fonts=fonts,
+        renderer=renderer,
+        device_pixel_ratio=device_pixel_ratio,
+        font_families=font_families,
+        lang=lang,
+        overflow=overflow,
+    )
+
+
+def render_markdown(
+    source: str,
+    *,
+    width: int = 800,
+    height: int | None = None,
+    format: Format = "png",
+    quality: int | None = None,
+    lossless: bool | None = None,
+    stylesheets: Sequence[str] | None = None,
+    css: str | None = None,
+    images: Mapping[str, bytes] | Sequence[Mapping[str, Any]] | None = None,
+    renderer: Renderer | None = None,
+    device_pixel_ratio: float | None = None,
+    font_families: Sequence[str] | None = None,
+    lang: str | None = None,
+    dark: bool = False,
+    overflow: str = "hidden",
+) -> bytes:
+    """Legacy alias for :func:`md_to_pic` (GitHub-style template)."""
+    return md_to_pic(
+        source,
+        width=width,
+        height=height,
+        format=format,
+        quality=quality,
+        lossless=lossless,
+        dark=dark,
+        css=css,
+        stylesheets=stylesheets,
+        images=images,
         renderer=renderer,
         device_pixel_ratio=device_pixel_ratio,
         font_families=font_families,

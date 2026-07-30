@@ -6,7 +6,8 @@ import html as html_lib
 import re
 import threading
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from pytakumi._native import Renderer
 
@@ -46,21 +47,21 @@ def register_fonts(
         return
     for item in fonts:
         if isinstance(item, (bytes, bytearray)):
-            renderer.register_font(bytes(item))
-        elif isinstance(item, Mapping):
-            data = item.get("data")
-            if data is None:
-                raise ValueError("font dict requires 'data' bytes")
-            renderer.register_font(
-                bytes(data),
-                name=item.get("name"),
-                weight=item.get("weight"),
-                style=item.get("style"),
-                subset_of=item.get("subset_of") or item.get("subsetOf"),
-                generic=item.get("generic"),
-            )
-        else:
+            _ = renderer.register_font(bytes(item))
+            continue
+        if not isinstance(item, Mapping):
             raise TypeError("fonts entries must be bytes or mapping with data=")
+        data = item.get("data")
+        if data is None:
+            raise ValueError("font dict requires 'data' bytes")
+        _ = renderer.register_font(
+            bytes(data),
+            name=item.get("name"),
+            weight=item.get("weight"),
+            style=item.get("style"),
+            subset_of=item.get("subset_of") or item.get("subsetOf"),
+            generic=item.get("generic"),
+        )
 
 
 def resolve_renderer(
@@ -117,7 +118,7 @@ def extract_styles_and_body(
     if overflow not in ("hidden", "visible"):
         raise ValueError("overflow must be 'hidden' or 'visible'")
 
-    styles = re.findall(r"<style[^>]*>(.*?)</style>", html, flags=re.I | re.S)
+    styles: list[str] = re.findall(r"<style[^>]*>(.*?)</style>", html, flags=re.I | re.S)
     body_m = re.search(r"<body[^>]*>(.*?)</body>", html, flags=re.I | re.S)
     body = body_m.group(1) if body_m else html
     body = re.sub(r"<script[^>]*>.*?</script>", "", body, flags=re.I | re.S)

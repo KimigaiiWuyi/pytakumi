@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 
 # Raise Python thread stacks on musl *before* any ThreadPoolExecutor work.
 # (RUST_MIN_STACK / Rayon only affect Rust threads — not Python workers.)
@@ -10,7 +9,7 @@ from pytakumi._stack import ensure_for_runtime as _ensure_thread_stacks
 
 _ensure_thread_stacks()
 
-from pytakumi._native import (
+from pytakumi._native import (  # noqa: E402
     NodeTree,
     Renderer,
     __version__,
@@ -23,8 +22,8 @@ from pytakumi._native import (
     supports_free_threading,
     text_node,
 )
-from pytakumi.api import html_to_pic, md_to_pic, text_to_pic
-from pytakumi.markdown import markdown_to_html, render_markdown, wrap_markdown_html
+from pytakumi.api import html_to_pic, md_to_pic, render_markdown, text_to_pic  # noqa: E402
+from pytakumi.markdown import markdown_to_html, wrap_markdown_html  # noqa: E402
 
 __all__ = [
     "NodeTree",
@@ -47,7 +46,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:  # pragma: no cover
+def __getattr__(name: str) -> object:  # pragma: no cover
     if name == "__version__":
         return __version__
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

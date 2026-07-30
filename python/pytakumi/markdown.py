@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, Sequence
-
-# Re-export high-level API for backwards compatibility.
-# (render_markdown implemented at bottom to avoid circular imports at type-check time)
 
 
 def markdown_to_html(source: str, *, renderer: str | None = None) -> str:
@@ -36,10 +32,11 @@ def markdown_to_html(source: str, *, renderer: str | None = None) -> str:
         except ValueError:
             # Preset lacks the plugin; keep rendering with available syntax.
             pass
-    return rewrite_tables_for_takumi(md.render(source))
+    rendered: str = str(md.render(source))
+    return rewrite_tables_for_takumi(rendered)
 
 
-_ALIGN_BY_MARKER = {
+_ALIGN_BY_MARKER: dict[str, str] = {
     "left": "md-table-cell-left",
     "right": "md-table-cell-right",
     "center": "md-table-cell-center",
@@ -116,16 +113,14 @@ def rewrite_tables_for_takumi(html: str) -> str:
         return html
 
     def _cell_pairs(row_inner: str) -> list[tuple[str, str]]:
-        return [
-            (open_tag, inner)
-            for open_tag, inner in re.findall(
-                r"(<t[hd][^>]*>)(.*?)</t[hd]>", row_inner, flags=re.I | re.S
-            )
-        ]
+        matches: list[tuple[str, str]] = re.findall(
+            r"(<t[hd][^>]*>)(.*?)</t[hd]>", row_inner, flags=re.I | re.S
+        )
+        return [(open_tag, inner) for open_tag, inner in matches]
 
     def _repl_table(match: re.Match[str]) -> str:
         table = match.group(0)
-        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", table, flags=re.I | re.S)
+        rows: list[str] = re.findall(r"<tr[^>]*>(.*?)</tr>", table, flags=re.I | re.S)
         if not rows:
             return table
 
@@ -291,41 +286,12 @@ def wrap_markdown_html(body_html: str, *, class_name: str = "markdown-body") -> 
     return f'<div class="{class_name}">{body_html}</div>'
 
 
-def render_markdown(
-    source: str,
-    *,
-    width: int = 800,
-    height: int | None = None,
-    format: str = "png",
-    quality: int | None = None,
-    lossless: bool | None = None,
-    stylesheets: Sequence[str] | None = None,
-    css: str | None = None,
-    images: Mapping[str, bytes] | Sequence[Mapping[str, Any]] | None = None,
-    renderer=None,
-    device_pixel_ratio: float | None = None,
-    font_families: Sequence[str] | None = None,
-    lang: str | None = None,
-    dark: bool = False,
-    overflow: str = "hidden",
-) -> bytes:
-    """Legacy alias for :func:`takumi.md_to_pic` (GitHub-style template)."""
-    from pytakumi.api import md_to_pic
+def __getattr__(name: str) -> object:
+    """Backward-compatible lazy export for the moved ``render_markdown`` alias."""
+    if name == "render_markdown":
+        import importlib
 
-    return md_to_pic(
-        source,
-        width=width,
-        height=height,
-        format=format,
-        quality=quality,
-        lossless=lossless,
-        dark=dark,
-        css=css,
-        stylesheets=stylesheets,
-        images=images,
-        renderer=renderer,
-        device_pixel_ratio=device_pixel_ratio,
-        font_families=font_families,
-        lang=lang,
-        overflow=overflow,
-    )
+        api = importlib.import_module("pytakumi.api")
+        return getattr(api, "render_markdown")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

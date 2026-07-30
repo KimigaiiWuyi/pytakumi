@@ -206,9 +206,9 @@ def test_reuse_renderer_across_helpers(renderer, geist_font_bytes):
 
     fonts = [{"data": geist_font_bytes, "name": "Geist"}]
     for fn in (
-        lambda: html_to_pic(full_bleed("#111"), width=40, height=40, renderer=renderer),
-        lambda: text_to_pic("x", width=200, height=120, renderer=renderer),
-        lambda: md_to_pic("# y", width=200, height=120, renderer=renderer),
+        lambda: html_to_pic(full_bleed("#111"), width=40, height=40, renderer=renderer, fonts=fonts),
+        lambda: text_to_pic("x", width=200, height=120, renderer=renderer, fonts=fonts),
+        lambda: md_to_pic("# y", width=200, height=120, renderer=renderer, fonts=fonts),
     ):
         assert_png(fn())
 
