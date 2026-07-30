@@ -6,8 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
 from pytakumi._native import Renderer
-
-Format = Literal["png", "jpeg", "jpg", "webp", "ico", "raw"]
 from pytakumi._util import (
     escape,
     extract_styles_and_body,
@@ -15,6 +13,8 @@ from pytakumi._util import (
     resolve_renderer,
 )
 from pytakumi.markdown import markdown_to_html, wrap_markdown_html
+
+Format = Literal["png", "jpeg", "jpg", "webp", "ico", "raw"]
 
 __all__ = [
     "html_to_pic",
@@ -214,9 +214,7 @@ def md_to_pic(
     """
     body_html = markdown_to_html(md)
     html = wrap_markdown_html(body_html)
-    gh_css = load_template(
-        "github-markdown-dark.css" if dark else "github-markdown.css"
-    )
+    gh_css = load_template("github-markdown-dark.css" if dark else "github-markdown.css")
     sheets = [gh_css]
     if stylesheets:
         sheets.extend(stylesheets)

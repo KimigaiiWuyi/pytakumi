@@ -113,9 +113,7 @@ def rewrite_tables_for_takumi(html: str) -> str:
         return html
 
     def _cell_pairs(row_inner: str) -> list[tuple[str, str]]:
-        matches: list[tuple[str, str]] = re.findall(
-            r"(<t[hd][^>]*>)(.*?)</t[hd]>", row_inner, flags=re.I | re.S
-        )
+        matches: list[tuple[str, str]] = re.findall(r"(<t[hd][^>]*>)(.*?)</t[hd]>", row_inner, flags=re.I | re.S)
         return [(open_tag, inner) for open_tag, inner in matches]
 
     def _repl_table(match: re.Match[str]) -> str:
@@ -294,4 +292,3 @@ def __getattr__(name: str) -> object:
         api = importlib.import_module("pytakumi.api")
         return getattr(api, "render_markdown")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-

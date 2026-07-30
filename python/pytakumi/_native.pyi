@@ -118,7 +118,6 @@ def from_html(
     max_depth: int | None = None,
     use_presets: bool = True,
 ) -> NodeTree: ...
-
 def text_node(
     text: str,
     *,
@@ -130,7 +129,6 @@ def text_node(
     dir: str | None = None,
     tag_name: str | None = None,
 ) -> NodeTree: ...
-
 def container(
     children: Sequence[NodeTree | dict[str, Any]] | None = None,
     *,
@@ -142,7 +140,6 @@ def container(
     dir: str | None = None,
     tag_name: str | None = None,
 ) -> NodeTree: ...
-
 def image_node(
     src: str | bytes,
     *,
@@ -154,9 +151,7 @@ def image_node(
     id: str | None = None,
     tag_name: str | None = None,
 ) -> NodeTree: ...
-
 def set_glyph_cache_max_bytes(bytes: int) -> None: ...
-
 def render(
     source: NodeTree | dict[str, Any],
     *,
@@ -175,7 +170,6 @@ def render(
     lang: str | None = None,
     fonts: Sequence[bytes | Mapping[str, Any]] | None = None,
 ) -> bytes: ...
-
 def render_html(
     html: str,
     *,
@@ -196,5 +190,4 @@ def render_html(
     max_depth: int | None = None,
     use_presets: bool = True,
 ) -> bytes: ...
-
 def supports_free_threading() -> bool: ...
