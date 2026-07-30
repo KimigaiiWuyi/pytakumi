@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 __version__: str
@@ -121,7 +122,6 @@ def from_html(
     max_depth: int | None = None,
     use_presets: bool = True,
 ) -> NodeTree: ...
-
 def text_node(
     text: str,
     *,
@@ -133,7 +133,6 @@ def text_node(
     dir: str | None = None,
     tag_name: str | None = None,
 ) -> NodeTree: ...
-
 def container(
     children: Sequence[NodeTree | dict[str, Any]] | None = None,
     *,
@@ -145,7 +144,6 @@ def container(
     dir: str | None = None,
     tag_name: str | None = None,
 ) -> NodeTree: ...
-
 def image_node(
     src: str | bytes,
     *,
@@ -157,9 +155,7 @@ def image_node(
     id: str | None = None,
     tag_name: str | None = None,
 ) -> NodeTree: ...
-
 def set_glyph_cache_max_bytes(bytes: int) -> None: ...
-
 def render(
     source: NodeTree | dict[str, Any],
     *,
@@ -178,7 +174,6 @@ def render(
     lang: str | None = None,
     fonts: Sequence[bytes | Mapping[str, Any]] | None = None,
 ) -> bytes: ...
-
 def render_html(
     html: str,
     *,
@@ -199,7 +194,6 @@ def render_html(
     max_depth: int | None = None,
     use_presets: bool = True,
 ) -> bytes: ...
-
 def html_to_pic(
     html: str,
     *,
@@ -220,8 +214,8 @@ def html_to_pic(
     max_depth: int | None = None,
     use_presets: bool = True,
     overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes: ...
-
 def text_to_pic(
     text: str,
     *,
@@ -236,14 +230,18 @@ def text_to_pic(
     lossless: bool | None = None,
     css: str | None = None,
     stylesheets: Sequence[str] | None = None,
+    images: Mapping[str, bytes] | Sequence[Mapping[str, Any]] | None = None,
     fonts: Sequence[bytes | Mapping[str, Any]] | None = None,
     renderer: Renderer | None = None,
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
+    draw_debug_border: bool = False,
+    max_depth: int | None = None,
+    use_presets: bool = True,
     overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes: ...
-
 def md_to_pic(
     md: str,
     *,
@@ -261,9 +259,12 @@ def md_to_pic(
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
+    draw_debug_border: bool = False,
+    max_depth: int | None = None,
+    use_presets: bool = True,
     overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes: ...
-
 def render_markdown(
     source: str,
     *,
@@ -281,7 +282,7 @@ def render_markdown(
     lang: str | None = None,
     dark: bool = False,
     overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes: ...
-
 def markdown_to_html(source: str, *, renderer: str | None = None) -> str: ...
 def wrap_markdown_html(body_html: str, *, class_name: str = "markdown-body") -> str: ...

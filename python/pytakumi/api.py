@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any, Literal
 
 from pytakumi._native import Renderer
@@ -17,11 +19,21 @@ from pytakumi.markdown import markdown_to_html, wrap_markdown_html
 Format = Literal["png", "jpeg", "jpg", "webp", "ico", "raw"]
 
 __all__ = [
+    "Format",
     "html_to_pic",
-    "text_to_pic",
     "md_to_pic",
     "render_markdown",
+    "text_to_pic",
 ]
+
+
+def _maybe_save(data: bytes, save_to: str | Path | None) -> bytes:
+    """Write *data* to *save_to* when given; always return *data*."""
+    if save_to is not None:
+        p = Path(save_to)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+    return data
 
 
 def html_to_pic(
@@ -43,7 +55,8 @@ def html_to_pic(
     draw_debug_border: bool = False,
     max_depth: int | None = None,
     use_presets: bool = True,
-    overflow: str = "hidden",
+    overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes:
     """Render an HTML fragment/document to image bytes.
 
@@ -70,6 +83,9 @@ def html_to_pic(
     overflow:
         Root wrapper overflow: ``hidden`` (default) clips content that exceeds
         the fixed box; ``visible`` disables clipping.
+    save_to:
+        Optional file path. When set, the rendered bytes are also written to
+        this path (parent directories created automatically).
     """
     r = resolve_renderer(renderer, fonts)
     extracted, body = extract_styles_and_body(
@@ -85,7 +101,7 @@ def html_to_pic(
     if css:
         sheets.append(css)
 
-    return r.render_html(
+    data = r.render_html(
         body,
         width=width,
         height=height,
@@ -101,6 +117,7 @@ def html_to_pic(
         max_depth=max_depth,
         use_presets=use_presets,
     )
+    return _maybe_save(data, save_to)
 
 
 def text_to_pic(
@@ -111,18 +128,23 @@ def text_to_pic(
     title: str | None = None,
     eyebrow: str | None = None,
     footer: str | None = None,
-    theme: str = "dark",
+    theme: Literal["dark", "light"] = "dark",
     format: Format = "png",
     quality: int | None = None,
     lossless: bool | None = None,
     css: str | None = None,
     stylesheets: Sequence[str] | None = None,
+    images: Mapping[str, bytes] | Sequence[Mapping[str, Any]] | None = None,
     fonts: Sequence[bytes | Mapping[str, Any]] | None = None,
     renderer: Renderer | None = None,
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
-    overflow: str = "hidden",
+    draw_debug_border: bool = False,
+    max_depth: int | None = None,
+    use_presets: bool = True,
+    overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes:
     """Render plain text with a card template (not raw HTML).
 
@@ -141,6 +163,9 @@ def text_to_pic(
     overflow:
         Root wrapper overflow: ``hidden`` (default) clips content that exceeds
         the fixed box; ``visible`` disables clipping.
+    save_to:
+        Optional file path. When set, the rendered bytes are also written to
+        this path (parent directories created automatically).
     """
     root_class = "text-card light" if theme == "light" else "text-card"
     blocks: list[str] = [f'<div class="{root_class}">']
@@ -169,12 +194,17 @@ def text_to_pic(
         quality=quality,
         lossless=lossless,
         stylesheets=sheets,
+        images=images,
         fonts=fonts,
         renderer=renderer,
         device_pixel_ratio=device_pixel_ratio,
         font_families=font_families,
         lang=lang,
+        draw_debug_border=draw_debug_border,
+        max_depth=max_depth,
+        use_presets=use_presets,
         overflow=overflow,
+        save_to=save_to,
     )
 
 
@@ -195,7 +225,11 @@ def md_to_pic(
     device_pixel_ratio: float | None = None,
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
-    overflow: str = "hidden",
+    draw_debug_border: bool = False,
+    max_depth: int | None = None,
+    use_presets: bool = True,
+    overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes:
     """Render Markdown as a GitHub-README-style document image.
 
@@ -211,6 +245,9 @@ def md_to_pic(
     overflow:
         Root wrapper overflow: ``hidden`` (default) clips content that exceeds
         a fixed box; ``visible`` disables clipping.
+    save_to:
+        Optional file path. When set, the rendered bytes are also written to
+        this path (parent directories created automatically).
     """
     body_html = markdown_to_html(md)
     html = wrap_markdown_html(body_html)
@@ -235,7 +272,11 @@ def md_to_pic(
         device_pixel_ratio=device_pixel_ratio,
         font_families=font_families,
         lang=lang,
+        draw_debug_border=draw_debug_border,
+        max_depth=max_depth,
+        use_presets=use_presets,
         overflow=overflow,
+        save_to=save_to,
     )
 
 
@@ -255,9 +296,15 @@ def render_markdown(
     font_families: Sequence[str] | None = None,
     lang: str | None = None,
     dark: bool = False,
-    overflow: str = "hidden",
+    overflow: Literal["hidden", "visible"] = "hidden",
+    save_to: str | Path | None = None,
 ) -> bytes:
-    """Legacy alias for :func:`md_to_pic` (GitHub-style template)."""
+    """Deprecated alias for :func:`md_to_pic`. Use ``md_to_pic`` instead."""
+    warnings.warn(
+        "render_markdown is deprecated, use md_to_pic instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return md_to_pic(
         source,
         width=width,
@@ -274,4 +321,5 @@ def render_markdown(
         font_families=font_families,
         lang=lang,
         overflow=overflow,
+        save_to=save_to,
     )

@@ -22,10 +22,11 @@ from pytakumi._native import (  # noqa: E402
     supports_free_threading,
     text_node,
 )
-from pytakumi.api import html_to_pic, md_to_pic, render_markdown, text_to_pic  # noqa: E402
+from pytakumi.api import Format, html_to_pic, md_to_pic, render_markdown, text_to_pic  # noqa: E402
 from pytakumi.markdown import markdown_to_html, wrap_markdown_html  # noqa: E402
 
 __all__ = [
+    "Format",
     "NodeTree",
     "Renderer",
     "__version__",

@@ -7,7 +7,7 @@ import re
 import threading
 from pathlib import Path
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from pytakumi._native import Renderer
 
@@ -100,7 +100,7 @@ def extract_styles_and_body(
     width: int | None,
     height: int | None,
     device_pixel_ratio: float | None = None,
-    overflow: str = "hidden",
+    overflow: Literal["hidden", "visible"] = "hidden",
 ) -> tuple[list[str], str]:
     """Pull <style> blocks out and wrap body content for Takumi.
 
