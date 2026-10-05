@@ -1,6 +1,6 @@
 [package]
 name = "pytakumi"
-version = "0.1.0"
+version = "0.1.5"
 edition = "2024"
 rust-version = "1.91"
 license = "MIT OR Apache-2.0"
@@ -47,6 +47,12 @@ path = "vendor/takumi/takumi-core"
 default-features = false
 features = ["woff2", "woff", "svg"]
 
+# taffy: no local patch. takumi >= 2.12 reworked float layout and the engine no
+# longer trips the compute/float.rs `subdivide_segment` assertion (verified by
+# tests/test_float_regression.py + a 1500-case randomized float sweep). The
+# assertion itself is still present in taffy 0.14 as a tripwire, so do not
+# reintroduce CSS-float-heavy content without re-running that test.
+
 [profile.release]
 # Thin LTO: fat LTO + codegen-units=1 produced multi-MB stack frames on
 # x86_64 musl (SIGSEGV under cibuildwheel even with raised RUST_MIN_STACK).
@@ -54,4 +60,17 @@ lto = "thin"
 codegen-units = 1
 strip = true
 opt-level = 3
-panic = "abort"
+# NOTE: panic = "abort" removed on purpose. With abort, any engine panic killed
+# the host interpreter outright (no Python traceback, nothing try/except could
+# catch it) — one malformed card took down a whole gsuid_core process. With
+# unwind, PyO3 converts the panic into pyo3_runtime.PanicException at the FFI
+# boundary and callers can handle it. Verified: the taffy float assertion that
+# used to abort now surfaces as a catchable exception.
+#
+# This does NOT cover two hard-abort classes that are not panics and cannot be
+# unwound: stack overflow, and allocation failure (Rust aborts by design). Both
+# reproduce against this build:
+#   - deep nesting with max_depth=None -> 0xC00000FD STACK_OVERFLOW
+#   - device_pixel_ratio ~1e30         -> "memory allocation of ... failed"
+# Keep passing an explicit max_depth and keep dpr bounded.
+

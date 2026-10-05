@@ -89,6 +89,8 @@ impl Renderer {
         weight,
         css_style,
         subset_of,
+        // subset_rank: added in takumi 2.14; pytakumi exposes no rank option yet.
+        None,
         generic,
       )
       .map_err(|e| e.to_string())?;
@@ -154,7 +156,7 @@ impl Renderer {
     let lang = parse_lang(lang)?;
     let font_families = parse_font_families(font_families);
     let images = parse_images(&self.state.resource_cache, images)?;
-    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets);
+    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets)?;
     let vp = viewport(width, height, device_pixel_ratio);
     let time_ms = time_ms.unwrap_or(0).max(0) as u64;
 
@@ -211,7 +213,7 @@ impl Renderer {
     let lang = parse_lang(lang)?;
     let font_families = parse_font_families(font_families);
     let images = parse_images(&self.state.resource_cache, images)?;
-    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets);
+    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets)?;
     let vp = viewport(width, height, None);
     let time_ms = time_ms.unwrap_or(0).max(0) as u64;
     let state = Arc::clone(&self.state);
@@ -262,7 +264,7 @@ impl Renderer {
     let lang = parse_lang(lang)?;
     let font_families = parse_font_families(font_families);
     let images = parse_images(&self.state.resource_cache, images)?;
-    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets);
+    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets)?;
     let vp = viewport(width, height, None);
     let time_ms = time_ms.unwrap_or(0).max(0) as u64;
     let state = Arc::clone(&self.state);
@@ -329,7 +331,7 @@ impl Renderer {
     let lang = parse_lang(lang)?;
     let font_families = parse_font_families(font_families);
     let images = parse_images(&self.state.resource_cache, images)?;
-    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets);
+    let sheet = parse_stylesheets(&self.state.resource_cache, stylesheets)?;
     let vp = viewport(Some(width), Some(height), device_pixel_ratio);
     let state = Arc::clone(&self.state);
 

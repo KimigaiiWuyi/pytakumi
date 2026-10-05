@@ -9,7 +9,7 @@ use pyo3::types::{PyAnyMethods, PyDict, PyList};
 use takumi::prelude::*;
 use takumi_bindings_common::stylesheet;
 use takumi_core::resources::image::{ImageCacheMode, ImageSource, ResourceCache};
-use takumi_core::style::{FontFamily, Lang, StyleSheet};
+use takumi_core::style::{CssSource, FontFamily, Lang, StyleSheet};
 
 use crate::error::{to_py_err, PyRes};
 use crate::node::py_to_json;
@@ -107,7 +107,10 @@ pub(crate) fn parse_dithering(value: Option<&str>) -> PyRes<DitheringAlgorithm> 
   match value.unwrap_or("none").to_ascii_lowercase().as_str() {
     "none" => Ok(DitheringAlgorithm::None),
     "ordered-bayer" | "ordered_bayer" | "bayer" => Ok(DitheringAlgorithm::OrderedBayer),
-    "floyd-steinberg" | "floyd_steinberg" | "floyd" => Ok(DitheringAlgorithm::FloydSteinberg),
+    // takumi 2.14 deprecated FloydSteinberg to an alias of OrderedBayer (the
+    // whole-image error-diffusion pass is gone), so map the legacy spellings
+    // straight onto OrderedBayer: same pixels, no deprecated variant.
+    "floyd-steinberg" | "floyd_steinberg" | "floyd" => Ok(DitheringAlgorithm::OrderedBayer),
     other => Err(PyValueError::new_err(format!(
       "unknown dithering {other:?}; expected none, ordered-bayer, or floyd-steinberg"
     ))),
@@ -128,8 +131,10 @@ pub(crate) fn parse_font_families(families: Option<Vec<String>>) -> Option<FontF
 pub(crate) fn parse_stylesheets(
   cache: &ResourceCache,
   stylesheets: Option<Vec<String>>,
-) -> Arc<StyleSheet> {
-  stylesheet(cache, stylesheets, Vec::new())
+) -> PyRes<Arc<StyleSheet>> {
+  // takumi 2.14 takes `CssSource` (text or rule object) and returns Result.
+  let css = stylesheets.map(|sheets| sheets.into_iter().map(CssSource::Text).collect());
+  stylesheet(cache, css, Vec::new()).map_err(to_py_err)
 }
 
 /// Parse `images` as a list of `{src, data, cache?}` dicts or a `src -> bytes` mapping.
